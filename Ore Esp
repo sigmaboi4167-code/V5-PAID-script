@@ -12,196 +12,147 @@ local cheat = {
         end
     }
 }
-local _FindFirstChild = game.FindFirstChild
+
 local _FindFirstChildOfClass = game.FindFirstChildOfClass
 local _WorldToViewportPoint = workspace.CurrentCamera.WorldToViewportPoint
 local _Vector2new = Vector2.new
-local _Vector3new = Vector3.new
-local tablecreate = table.create
-local mathfloor = math.floor
+local camera = workspace.CurrentCamera
+local workspace = cloneref(game:GetService("Workspace"))
 
-cheat.EspLibrary = {}
-do
-    local esp_table = {}
-    local workspace = cloneref(game:GetService("Workspace"))
-    local container = Instance.new("Folder", game:GetService("CoreGui").RobloxGui)
-    esp_table = {
-        __loaded = false,
-        main_object_settings = {
-            textSize = 15,
-            textFont = Drawing.Fonts.Monospace,
-            distancelimit = false,
-            maxdistance = 200,
-            useteamcolor = false,
-            teamcheck = false,
-            sleepcheck = false,
-            allowed = {
-                ['ATV'] = true,
-                ['Stone'] = true,
-                ['Nitrate'] = true,
-                ['Iron'] = true,
-                ['Backpack'] = true,
-                ['Tree1'] = true,
-                ['Tree2'] = true,
-                ['Tree3'] = true,
-                ['Tree4'] = true,
-                ['TeslaPylon'] = true,
-                ['GasTrap'] = true,
-                ['ClaimTotem'] = true
-            }
+local esp_table = {
+    __loaded = false,
+    settings = {
+        textSize = 14,
+        textFont = Drawing.Fonts.Plex,
+        maxdistance = 300,
+        distancelimit = false,
+        allowed = { Stone = true, Nitrate = true, Iron = true },
+        ore_colors = {
+            Stone = { Color3.fromRGB(100, 100, 100), 1 },
+            Nitrate = { Color3.fromRGB(200, 200, 200), 1 },
+            Iron = { Color3.fromRGB(255, 165, 0), 1 }
         },
-        settings = {
-            object = {
-                enabled = true, -- ESP enabled by default
-                realname = true, -- Display object names
-                realname_outline = true, -- Outline for names
-                realname_color = { Color3.new(1, 1, 1), 1 }, -- White, fully opaque
-                realname_outline_color = Color3.new(0, 0, 0), -- Black outline
-                chams = false,
-                chams_visible_only = false,
-                chams_fill_color = { Color3.new(1, 1, 1), 0.5 },
-                chamsoutline_color = { Color3.new(1, 1, 1), 0 }
-            }
-        }
+        outline_color = Color3.fromRGB(0, 0, 0),
+        outline_enabled = true
     }
-    local loaded_plrs = {}
-    local camera = workspace.CurrentCamera
-    local enttiyidentification = {}
-    for i, v in game:GetService("ReplicatedStorage").Shared.entities:GetChildren() do
-        local model = _FindFirstChild(v, "Model")
-        if model and model.PrimaryPart then
-            enttiyidentification[v.Name] = {
-                CollisionGroup = model.PrimaryPart.CollisionGroup,
-                Material = model.PrimaryPart.Material,
-                Color = model.PrimaryPart.Color
-            }
-        end
-    end
+}
 
-    local function identify_model(model)
-        if model.ClassName ~= "Model" then return false, false end
-        if _FindFirstChildOfClass(model, "MeshPart") and _FindFirstChildOfClass(model, "MeshPart").MeshId == "rbxassetid://12939036056" then
-            if #model:GetChildren() == 1 then
-                return "Stone", model:GetChildren()[1]
-            else
-                for _, part in model:GetChildren() do
-                    if part.Color == Color3.fromRGB(248, 248, 248) then
-                        return "Nitrate", part
-                    elseif part.Color == Color3.fromRGB(199, 172, 120) then
-                        return "Iron", part
-                    end
+local ore_identification = {
+    Stone = { MeshId = "rbxassetid://12939036056", ChildCount = 1 },
+    Nitrate = { Color = Color3.fromRGB(248, 248, 248) },
+    Iron = { Color = Color3.fromRGB(199, 172, 120) }
+}
+
+local function identify_ore(model)
+    if model.ClassName ~= "Model" then return false, false end
+    local meshpart = _FindFirstChildOfClass(model, "MeshPart")
+    if meshpart and meshpart.MeshId == "rbxassetid://12939036056" then
+        if #model:GetChildren() == 1 then
+            return "Stone", model:GetChildren()[1]
+        else
+            for _, part in model:GetChildren() do
+                if part.Color == ore_identification.Nitrate.Color then
+                    return "Nitrate", part
+                elseif part.Color == ore_identification.Iron.Color then
+                    return "Iron", part
                 end
             end
         end
-        if not model.PrimaryPart then return end
-        local primpart = model.PrimaryPart
-        for name, entity in enttiyidentification do
-            if entity.Color == primpart.Color and entity.Material == primpart.Material and entity.CollisionGroup == primpart.CollisionGroup then
-                return name, primpart
-            end
-        end
-        return false, false
     end
-
-    local function worldToScreen(world)
-        local screen, inBounds = _WorldToViewportPoint(camera, world)
-        return _Vector2new(screen.X, screen.Y), inBounds, screen.Z
-    end
-
-    local esp = {}
-    esp.create_obj = function(type, args)
-        local obj = Drawing.new(type)
-        for i, v in args do
-            obj[i] = v
-        end
-        return obj
-    end
-
-    local function create_esp(model)
-        local espname, mainpart = identify_model(model)
-        if not (espname and mainpart) then return end
-        loaded_plrs[model] = {
-            obj = {
-                name = esp.create_obj("Text", { Center = true, Visible = false, Text = espname }),
-            }
-        }
-        local plr = loaded_plrs[model]
-        local obj = plr.obj
-        local realname = obj.name
-        local setvis_cache = false
-        local main_settings = esp_table.main_object_settings
-        local settings = esp_table.settings.object
-        local allowedobjs = main_settings.allowed
-
-        function plr:forceupdate()
-            realname.Size = main_settings.textSize
-            realname.Font = main_settings.textFont
-            realname.Color = settings.realname_color[1]
-            realname.Outline = settings.realname_outline
-            realname.OutlineColor = settings.realname_outline_color
-            realname.Transparency = settings.realname_color[2]
-        end
-
-        function plr:togglevis(bool)
-            if setvis_cache ~= bool then
-                for _, v in obj do v.Visible = bool end
-                setvis_cache = bool
-            end
-        end
-
-        plr.connection = cheat.utility.new_heartbeat(function(delta)
-            local plr = loaded_plrs[model]
-            if not (settings.enabled and mainpart and allowedobjs[espname]) then
-                return plr:togglevis(false)
-            end
-            local position, onscreen = worldToScreen(mainpart.Position)
-            if not onscreen then
-                return plr:togglevis(false)
-            end
-            plr:togglevis(true)
-            realname.Position = position
-        end)
-
-        plr:forceupdate()
-    end
-
-    local function destroy_esp(model)
-        local plr_object = loaded_plrs[model]
-        if not plr_object then return end
-        plr_object.connection:Disconnect()
-        for i, v in plr_object.obj do
-            v:Remove()
-        end
-        loaded_plrs[model] = nil
-    end
-
-    function esp_table.load()
-        assert(not esp_table.__loaded, "[ESP] already loaded")
-        for i, v in next, workspace:GetChildren() do
-            create_esp(v)
-        end
-        esp_table.playerAdded = workspace.ChildAdded:Connect(create_esp)
-        esp_table.playerRemoving = workspace.ChildRemoved:Connect(destroy_esp)
-        esp_table.__loaded = true
-    end
-
-    function esp_table.unload()
-        assert(esp_table.__loaded, "[ESP] not loaded yet")
-        for i, v in next, workspace:GetChildren() do
-            destroy_esp(v)
-        end
-        esp_table.playerAdded:Disconnect()
-        esp_table.playerRemoving:Disconnect()
-        esp_table.__loaded = false
-    end
-
-    function esp_table.icaca()
-        for _, v in loaded_plrs do
-            task.spawn(function() v:forceupdate() end)
-        end
-    end
-
-    cheat.EspLibrary = esp_table
+    return false, false
 end
 
-cheat.EspLibrary.load()
+local function worldToScreen(world)
+    local screen, inBounds = _WorldToViewportPoint(camera, world)
+    return _Vector2new(screen.X, screen.Y), inBounds
+end
+
+local loaded_ores = {}
+local function create_ore_esp(model)
+    local ore_name, mainpart = identify_ore(model)
+    if not (ore_name and mainpart and esp_table.settings.allowed[ore_name]) then return end
+
+    loaded_ores[model] = {
+        obj = {
+            label = cheat.utility.new_drawing("Text", {
+                Center = true,
+                Visible = false,
+                Text = ore_name,
+                Size = esp_table.settings.textSize,
+                Font = esp_table.settings.textFont,
+                Color = esp_table.settings.ore_colors[ore_name][1],
+                Transparency = esp_table.settings.ore_colors[ore_name][2],
+                Outline = esp_table.settings.outline_enabled,
+                OutlineColor = esp_table.settings.outline_color
+            })
+        }
+    }
+
+    local ore = loaded_ores[model]
+    local label = ore.obj.label
+    local setvis_cache = false
+
+    ore.connection = cheat.utility.new_heartbeat(function()
+        if not (mainpart and esp_table.settings.allowed[ore_name]) then
+            if setvis_cache then
+                label.Visible = false
+                setvis_cache = false
+            end
+            return
+        end
+
+        local distance = (camera.CFrame.Position - mainpart.Position).Magnitude
+        if esp_table.settings.distancelimit and distance > esp_table.settings.maxdistance then
+            if setvis_cache then
+                label.Visible = false
+                setvis_cache = false
+            end
+            return
+        end
+
+        local position, onscreen = worldToScreen(mainpart.Position)
+        if not onscreen then
+            if setvis_cache then
+                label.Visible = false
+                setvis_cache = false
+            end
+            return
+        end
+
+        if not setvis_cache then
+            label.Visible = true
+            setvis_cache = true
+        end
+        label.Position = position
+    end)
+end
+
+local function destroy_ore_esp(model)
+    local ore = loaded_ores[model]
+    if not ore then return end
+    ore.connection:Disconnect()
+    ore.obj.label:Remove()
+    loaded_ores[model] = nil
+end
+
+function esp_table.load()
+    if esp_table.__loaded then return end
+    for _, v in workspace:GetChildren() do
+        create_ore_esp(v)
+    end
+    esp_table.oreAdded = workspace.ChildAdded:Connect(create_ore_esp)
+    esp_table.oreRemoving = workspace.ChildRemoved:Connect(destroy_ore_esp)
+    esp_table.__loaded = true
+end
+
+function esp_table.unload()
+    if not esp_table.__loaded then return end
+    for _, v in workspace:GetChildren() do
+        destroy_ore_esp(v)
+    end
+    esp_table.oreAdded:Disconnect()
+    esp_table.oreRemoving:Disconnect()
+    esp_table.__loaded = false
+end
+
+esp_table.load()
