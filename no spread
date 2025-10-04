@@ -1,0 +1,10 @@
+local no_spread; no_spread = hookmetamethod(Random.new(), "__namecall", newcclosure(function(self, ...)
+    local method = getnamecallmethod()
+    if method == "NextInteger" and debug.info(3, "l") == 283 and debug.info(3, "s"):find("RangedWeaponClient") or method == "NextInteger" and debug.info(3, "l") == 152 and debug.info(3, "s"):find("BowClient") then
+        if getstack(3, 12) == -100 and getstack(3, 13) == 100 then
+            setstack(3, 12, math.random(0, 0))
+            setstack(3, 13, math.random(0, 0))
+        end
+    end
+    return no_spread(self, ...)
+end))
