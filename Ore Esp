@@ -18,6 +18,7 @@ local _WorldToViewportPoint = workspace.CurrentCamera.WorldToViewportPoint
 local _Vector2new = Vector2.new
 local camera = workspace.CurrentCamera
 local workspace = cloneref(game:GetService("Workspace"))
+local coreGui = game:GetService("CoreGui")
 
 local esp_table = {
     __loaded = false,
@@ -33,7 +34,15 @@ local esp_table = {
             Iron = { Color3.fromRGB(255, 165, 0), 1 }
         },
         outline_color = Color3.fromRGB(0, 0, 0),
-        outline_enabled = true
+        outline_enabled = true,
+        chams_enabled = true,
+        chams_visible_only = false,
+        chams_fill_colors = {
+            Stone = { Color3.fromRGB(100, 100, 100), 0.5 },
+            Nitrate = { Color3.fromRGB(200, 200, 200), 0.5 },
+            Iron = { Color3.fromRGB(255, 165, 0), 0.5 }
+        },
+        chams_outline_color = { Color3.fromRGB(255, 255, 255), 0 }
     }
 }
 
@@ -42,6 +51,9 @@ local ore_identification = {
     Nitrate = { Color = Color3.fromRGB(248, 248, 248) },
     Iron = { Color = Color3.fromRGB(199, 172, 120) }
 }
+
+local container = Instance.new("Folder", coreGui.RobloxGui)
+container.Name = "ESPContainer"
 
 local function identify_ore(model)
     if model.ClassName ~= "Model" then return false, false end
@@ -85,17 +97,28 @@ local function create_ore_esp(model)
                 Outline = esp_table.settings.outline_enabled,
                 OutlineColor = esp_table.settings.outline_color
             })
-        }
+        },
+        chams = Instance.new("Highlight", container)
     }
 
     local ore = loaded_ores[model]
     local label = ore.obj.label
+    local chams = ore.chams
     local setvis_cache = false
+
+    chams.Adornee = model
+    chams.DepthMode = esp_table.settings.chams_visible_only and Enum.HighlightDepthMode.Occluded or Enum.HighlightDepthMode.AlwaysOnTop
+    chams.FillColor = esp_table.settings.chams_fill_colors[ore_name][1]
+    chams.FillTransparency = esp_table.settings.chams_fill_colors[ore_name][2]
+    chams.OutlineColor = esp_table.settings.chams_outline_color[1]
+    chams.OutlineTransparency = esp_table.settings.chams_outline_color[2]
+    chams.Enabled = esp_table.settings.chams_enabled
 
     ore.connection = cheat.utility.new_heartbeat(function()
         if not (mainpart and esp_table.settings.allowed[ore_name]) then
             if setvis_cache then
                 label.Visible = false
+                chams.Enabled = false
                 setvis_cache = false
             end
             return
@@ -105,6 +128,7 @@ local function create_ore_esp(model)
         if esp_table.settings.distancelimit and distance > esp_table.settings.maxdistance then
             if setvis_cache then
                 label.Visible = false
+                chams.Enabled = false
                 setvis_cache = false
             end
             return
@@ -114,6 +138,7 @@ local function create_ore_esp(model)
         if not onscreen then
             if setvis_cache then
                 label.Visible = false
+                chams.Enabled = false
                 setvis_cache = false
             end
             return
@@ -121,6 +146,7 @@ local function create_ore_esp(model)
 
         if not setvis_cache then
             label.Visible = true
+            chams.Enabled = esp_table.settings.chams_enabled
             setvis_cache = true
         end
         label.Position = position
@@ -132,6 +158,9 @@ local function destroy_ore_esp(model)
     if not ore then return end
     ore.connection:Disconnect()
     ore.obj.label:Remove()
+    if ore.chams then
+        ore.chams:Destroy()
+    end
     loaded_ores[model] = nil
 end
 
