@@ -1,0 +1,10 @@
+local reloadDuringShoot = true
+
+local reloadDuringShoot;reloadDuringShoot = hookfunction(getupvalues(getrenv()._G.modules.FPS.ToolControllers.RangedWeapon.PlayerFire)[1],function(...)
+local arg = {...}
+if gunMods.noReloadanimTog == true then
+arg[2]['ReloadTime'] = 0
+return reloadDuringShoot(unpack(arg))
+end
+return reloadDuringShoot(...)
+end)
