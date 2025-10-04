@@ -35,7 +35,7 @@ local esp_table = {
             dist_color = { Color3.new(1, 1, 1), 1 },
             weapon_color = { Color3.new(1, 1, 1), 1 },
             skeleton_color = { Color3.new(1, 1, 1), 1 },
-            tracer_color = { Color3.new(1, 1, 1), 1 }, -- Tracer color setting
+            tracer_color = { Color3.new(1, 1, 1), 1 }, 
             box_outline_color = { Color3.new(0, 0, 0), 1 },
             realname_outline_color = Color3.new(0, 0, 0),
             dist_outline_color = Color3.new(0, 0, 0),
@@ -109,7 +109,7 @@ local function create_player_esp(model)
             realname = esp.create_obj("Text", { Center = true, Visible = true }),
             dist = esp.create_obj("Text", { Center = true, Visible = true }),
             weapon = esp.create_obj("Text", { Center = true, Visible = true }),
-            tracer = esp.create_obj("Line", { Thickness = 1, Visible = true }) -- Tracer object
+            tracer = esp.create_obj("Line", { Thickness = 1, Visible = true })
         },
         chams_object = Instance.new("Highlight", container)
     }
