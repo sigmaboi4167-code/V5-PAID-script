@@ -24,6 +24,7 @@ local esp_table = {
             dist = true,
             weapon = true,
             skeleton = true,
+            tracers = true, -- Tracer toggle
             box_outline = true,
             realname_outline = true,
             dist_outline = true,
@@ -34,6 +35,7 @@ local esp_table = {
             dist_color = { Color3.new(1, 1, 1), 1 },
             weapon_color = { Color3.new(1, 1, 1), 1 },
             skeleton_color = { Color3.new(1, 1, 1), 1 },
+            tracer_color = { Color3.new(1, 1, 1), 1 }, -- Tracer color setting
             box_outline_color = { Color3.new(0, 0, 0), 1 },
             realname_outline_color = Color3.new(0, 0, 0),
             dist_outline_color = Color3.new(0, 0, 0),
@@ -107,6 +109,7 @@ local function create_player_esp(model)
             realname = esp.create_obj("Text", { Center = true, Visible = true }),
             dist = esp.create_obj("Text", { Center = true, Visible = true }),
             weapon = esp.create_obj("Text", { Center = true, Visible = true }),
+            tracer = esp.create_obj("Line", { Thickness = 1, Visible = true }) -- Tracer object
         },
         chams_object = Instance.new("Highlight", container)
     }
@@ -157,6 +160,9 @@ local function create_player_esp(model)
         obj.weapon.OutlineColor = settings.weapon_outline_color
         obj.weapon.Transparency = settings.weapon_color[2]
 
+        obj.tracer.Color = rainbowColor
+        obj.tracer.Transparency = settings.tracer_color[2]
+
         cham.Enabled = settings.chams
         obj.box.Visible = settings.box
         obj.box_outline.Visible = settings.box_outline
@@ -164,6 +170,7 @@ local function create_player_esp(model)
         obj.realname.Visible = settings.realname
         obj.dist.Visible = settings.dist
         obj.weapon.Visible = settings.weapon
+        obj.tracer.Visible = settings.tracers
 
         for required, _ in next, skeleton_order do
             local skeletonobj = obj["skeleton_" .. required]
@@ -237,6 +244,17 @@ local function create_player_esp(model)
                     skeletonobj.From = Vector2.new(part_position.X, part_position.Y)
                     skeletonobj.To = Vector2.new(parent_part_position.X, parent_part_position.Y)
                 end
+            end
+        end
+
+        if settings.tracers then
+            local torsoPos, onScreenTorso = worldToScreen(lowertorso.Position)
+            if onScreenTorso then
+                local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
+                obj.tracer.From = screenCenter
+                obj.tracer.To = torsoPos
+            else
+                obj.tracer.Visible = false
             end
         end
     end)
