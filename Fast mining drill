@@ -1,0 +1,5 @@
+for _, v in getgc(true) do
+        if type(v) == "table" and rawget(v, "type") == "MiningDrill" then
+            v.AttackCooldown = 0
+        end
+    end
