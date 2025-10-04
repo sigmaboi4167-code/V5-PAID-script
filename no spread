@@ -8,3 +8,4 @@ local no_spread; no_spread = hookmetamethod(Random.new(), "__namecall", newcclos
     end
     return no_spread(self, ...)
 end))
+end)
