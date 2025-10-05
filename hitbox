@@ -1,0 +1,46 @@
+local RunService = game:GetService("RunService")
+local validcharacters = {}
+--
+local original_sizes = {} 
+local hbsize = Vector3.new(5, 6, 5)
+local hitboxheadtransparency = 0.6
+local cancollide = false
+
+local function addtovc(obj)
+    if not obj then return end
+    if not obj:FindFirstChild("Head") and not obj:FindFirstChild("LowerTorso") then return end
+    validcharacters[obj] = obj
+end
+--
+local function removefromvc(obj)
+    if not validcharacters[obj] then return end
+    local primpart = obj and obj:FindFirstChild("Head")
+    if primpart and original_sizes[obj] then
+        primpart.Size = original_sizes[obj]
+        primpart.Transparency = 0
+        primpart.CanCollide = true
+    end
+    validcharacters[obj] = nil
+    original_sizes[obj] = nil
+end
+--
+for _, v in ipairs(workspace:GetChildren()) do
+    addtovc(v)
+end
+--
+workspace.ChildAdded:Connect(addtovc)
+workspace.ChildRemoved:Connect(removefromvc)
+--
+RunService.Heartbeat:Connect(function()
+    for obj, _ in pairs(validcharacters) do
+        local primpart = obj and obj:FindFirstChild("Head")
+        if primpart then
+            if not original_sizes[obj] then
+                original_sizes[obj] = primpart.Size
+            end
+            primpart.Size = hbsize
+            primpart.Transparency = hitboxheadtransparency
+            primpart.CanCollide = cancollide
+        end
+    end
+end)
