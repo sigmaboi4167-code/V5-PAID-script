@@ -1,0 +1,130 @@
+local baseRadius = 199
+
+local fovCircle = Drawing.new("Circle")
+fovCircle.Visible = true
+fovCircle.Thickness = 1
+fovCircle.Color = Color3.fromRGB(255, 255, 255)
+fovCircle.Radius = baseRadius
+fovCircle.Filled = false
+
+local snapLine = Drawing.new("Line")
+snapLine.Visible = false
+snapLine.Color = Color3.fromRGB(255, 255, 255)
+snapLine.Thickness = 1
+
+local targetCircle = Drawing.new("Circle")
+targetCircle.Visible = false
+targetCircle.Thickness = 1
+targetCircle.Color = Color3.fromRGB(255, 255, 255)
+targetCircle.Radius = 2
+targetCircle.Filled = false
+
+local CoreGui = game:GetService("CoreGui")
+local HL = Instance.new("Highlight")
+HL.Name = "Highlight"
+HL.Parent = CoreGui
+HL.FillTransparency = 1
+HL.OutlineColor = Color3.fromRGB(255, 255, 255)
+
+local RunService = game:GetService("RunService")
+local Classes = getrenv()._G.classes
+local CameraClient = Classes.Camera
+local FPSClient = Classes.FPS
+local Camera = cloneref(game:GetService("Workspace").CurrentCamera)
+
+local GetFunction = function(Script, Line)
+    for _, v in pairs(getgc()) do
+        if typeof(v) == "function" and debug.info(v, "sl") then
+            local src, lineNum = debug.info(v, "s"), debug.info(v, "l")
+            if src:find(Script) and lineNum == Line then
+                return v
+            end
+        end
+    end
+end
+
+local SetInfraredEnabled = GetFunction("PlayerClient", 588)
+local PlayerReg = debug.getupvalue(SetInfraredEnabled, 2)
+
+local validGuns = {
+    "AR15", "C9", "Crossbow", "Bow", "EnergyRifle", "GaussRifle",
+    "HMAR", "KABAR", "LeverActionRifle", "M4A1", "PipePistol",
+    "PipeSMG", "PumpShotgun", "SCAR", "SVD", "USP9", "UZI", "Blunderbuss"
+}
+
+function IsValidGun(gun)
+    return table.find(validGuns, tostring(gun)) ~= nil
+end
+
+function GetClosestTarget(maxDistance)
+    local closestTarget, targetVelocity, closestDistance = nil, nil, math.huge
+    for i, v in next, PlayerReg do
+        if v.type == "Player" and not v.sleeping and v.model:FindFirstChild("HumanoidRootPart") then
+            local distanceToPlayer = (v.model.HumanoidRootPart.Position - Camera.CFrame.Position).Magnitude
+            local screenPoint = Camera:WorldToViewportPoint(v.model.Head.Position)
+            local distanceFromCenter = (Vector2.new(screenPoint.X, screenPoint.Y) - fovCircle.Position).Magnitude
+            if distanceToPlayer <= maxDistance and distanceFromCenter <= fovCircle.Radius and distanceToPlayer < closestDistance then
+                closestTarget = v.model
+                targetVelocity = v.velocityVector
+                closestDistance = distanceToPlayer
+            end
+        end
+    end
+    return closestTarget, targetVelocity
+end
+
+function CalculateBulletDrop(tPos, tVel, cPos, pSpeed, pDrop)
+    local dTT = (tPos - cPos).Magnitude
+    local tTT = dTT / pSpeed
+
+    local sVE = 8.8 - (pSpeed / (400 + pSpeed / 30))
+
+    local horizontalVel = Vector3.new(tVel.X, 0, tVel.Z) * 7
+    local verticalVel = Vector3.new(0, tVel.Y, 0) * 2
+
+    local adjustedVel = horizontalVel + verticalVel
+
+    local pTP = tPos + (adjustedVel * tTT)
+
+    local dP = -pDrop ^ (tTT * pDrop) + 1
+    local pPWD = pTP - Vector3.new(0, dP, 0)
+
+    return pPWD
+end
+
+local oldGetCFrame = CameraClient.GetCFrame
+CameraClient.GetCFrame = function()
+    local closest, velocityVector = GetClosestTarget(1000)
+    local equippedData = FPSClient.GetEquippedItem()
+    if equippedData and closest and closest:FindFirstChild("HumanoidRootPart") and IsValidGun(equippedData.type) then
+        local itemClass = Classes[equippedData.type]
+        if itemClass then
+            local projectileSpeed = itemClass.ProjectileSpeed
+            local projectileDrop = itemClass.ProjectileDrop
+            
+            local predictedPosition , tTT = CalculateBulletDrop(closest.Head.Position, velocityVector, Camera.CFrame.Position, projectileSpeed, projectileDrop)
+            return CFrame.new(Camera.CFrame.Position, predictedPosition)
+        end
+    end
+    return oldGetCFrame()
+end
+
+RunService.RenderStepped:Connect(function()
+    fovCircle.Radius = baseRadius * (math.tan(math.rad(50)) / math.tan(math.rad(Camera.FieldOfView))) ^ 0.35
+    fovCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+    local closest, _ = GetClosestTarget(1000)
+    if closest and closest:FindFirstChild("Head") then
+        local headPosition = Camera:WorldToViewportPoint(closest.Head.Position)
+        snapLine.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+        snapLine.To = Vector2.new(headPosition.X, headPosition.Y)
+        snapLine.Visible = true
+        targetCircle.Position = Vector2.new(headPosition.X, headPosition.Y)
+        targetCircle.Visible = true
+        HL.Adornee = closest
+    else
+        HL.Adornee = nil
+        snapLine.Visible = false
+        targetCircle.Visible = false
+    end
+end)
+end)
