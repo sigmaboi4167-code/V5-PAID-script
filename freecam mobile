@@ -1,0 +1,219 @@
+-- Services
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+
+-- Player and camera
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+local cam = workspace.CurrentCamera
+
+-- UI: Panel, title, toggle
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "FreecamGUI"
+screenGui.ResetOnSpawn = false
+screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+screenGui.DisplayOrder = 999
+screenGui.Parent = playerGui
+
+local panel = Instance.new("Frame")
+panel.Name = "Panel"
+panel.ZIndex = 1
+panel.Size = UDim2.new(0, 200, 0, 70)
+panel.Position = UDim2.new(0, 14, 0, 120)
+panel.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+panel.BorderSizePixel = 0
+panel.Active = true
+panel.Draggable = true
+panel.Parent = screenGui
+
+local stroke = Instance.new("UIStroke", panel)
+stroke.Thickness = 2
+stroke.Color = Color3.fromRGB(90, 90, 90)
+
+local corner = Instance.new("UICorner", panel)
+corner.CornerRadius = UDim.new(0, 8)
+
+local title = Instance.new("TextLabel", panel)
+title.Name = "Title"
+title.AnchorPoint = Vector2.new(0.5, 0)
+title.Position = UDim2.new(0.5, 0, 0, 6)
+title.Size = UDim2.new(0.9, 0, 0, 28)
+title.BackgroundTransparency = 1
+title.Text = "Freecam"
+title.TextColor3 = Color3.fromRGB(230, 230, 230)
+title.TextScaled = true
+title.Font = Enum.Font.GothamBold
+
+local toggle = Instance.new("TextButton", panel)
+toggle.Name = "Toggle"
+toggle.AnchorPoint = Vector2.new(0.5, 1)
+toggle.Position = UDim2.new(0.5, 0, 1, -8)
+toggle.Size = UDim2.new(0.7, 0, 0, 30)
+toggle.ZIndex = panel.ZIndex + 2
+toggle.BackgroundColor3 = Color3.fromRGB(170, 50, 50)
+toggle.Text = "Off"
+toggle.TextColor3 = Color3.new(1, 1, 1)
+toggle.TextScaled = true
+toggle.Font = Enum.Font.GothamBold
+toggle.AutoButtonColor = false
+
+local toggleCorner = Instance.new("UICorner", toggle)
+toggleCorner.CornerRadius = UDim.new(0, 8)
+
+-- Mobile arrow cluster
+local moveArrows = Instance.new("Frame", screenGui)
+moveArrows.Name = "MoveArrows"
+moveArrows.Size = UDim2.new(0, 170, 0, 170)
+moveArrows.AnchorPoint = Vector2.new(0, 1)
+moveArrows.Position = UDim2.new(0, 20, 1, -20)
+moveArrows.BackgroundTransparency = 1
+moveArrows.Visible = false
+
+local function makeArrow(parent, name, text, pos)
+    local btn = Instance.new("TextButton", parent)
+    btn.Name = name
+    btn.Size = UDim2.new(0, 54, 0, 54)
+    btn.Position = pos
+    btn.Text = text
+    btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    btn.TextColor3 = Color3.new(1, 1, 1)
+    btn.TextScaled = true
+    btn.Font = Enum.Font.GothamBold
+    btn.AutoButtonColor = false
+    local c = Instance.new("UICorner", btn)
+    c.CornerRadius = UDim.new(0, 12)
+    local s = Instance.new("UIStroke", btn)
+    s.Thickness = 2
+    s.Color = Color3.fromRGB(90, 90, 90)
+    return btn
+end
+
+local btnW = makeArrow(moveArrows, "W", "W", UDim2.new(0.5, -27, 0, 0))
+local btnA = makeArrow(moveArrows, "A", "A", UDim2.new(0, 0, 0.5, -27))
+local btnS = makeArrow(moveArrows, "S", "S", UDim2.new(0.5, -27, 1, -54))
+local btnD = makeArrow(moveArrows, "D", "D", UDim2.new(1, -54, 0.5, -27))
+
+-- Freecam state/data
+local freecamEnabled = false
+local yaw, pitch = 0, 0
+local moveSpeed = 35
+local mouseSensitivity = 0.002
+local keysDown = {W=false, A=false, S=false, D=false}
+
+local function setToggleVisual(on)
+    toggle.BackgroundColor3 = on and Color3.fromRGB(50, 170, 80) or Color3.fromRGB(170, 50, 50)
+    toggle.Text = on and "On" or "Off"
+end
+
+local function freezeHumanoid()
+    local char = player.Character
+    if char and char:FindFirstChildOfClass("Humanoid") then
+        char:FindFirstChildOfClass("Humanoid").WalkSpeed = 0
+        char:FindFirstChildOfClass("Humanoid").JumpPower = 0
+    end
+end
+
+local function unfreezeHumanoid()
+    local char = player.Character
+    if char and char:FindFirstChildOfClass("Humanoid") then
+        char:FindFirstChildOfClass("Humanoid").WalkSpeed = 16
+        char:FindFirstChildOfClass("Humanoid").JumpPower = 50
+    end
+end
+
+local function saveCamera()
+    return {
+        CameraType = cam.CameraType,
+        CameraSubject = cam.CameraSubject,
+        CFrame = cam.CFrame,
+    }
+end
+
+local function restoreCamera(data)
+    cam.CameraType = data.CameraType or Enum.CameraType.Custom
+    cam.CameraSubject = data.CameraSubject or player.Character
+    if data.CFrame then cam.CFrame = data.CFrame end
+end
+
+local function seedOrientation(cf)
+    local pos = cf.Position
+    local look = cf.LookVector
+    yaw = math.atan2(-look.X, -look.Z)
+    pitch = math.clamp(math.asin(look.Y), math.rad(-85), math.rad(85))
+    return pos
+end
+
+local function keyboardMoveVector()
+    local x = (keysDown.D and 1 or 0) - (keysDown.A and 1 or 0)
+    local z = (keysDown.S and 1 or 0) - (keysDown.W and 1 or 0)
+    local v = Vector3.new(x, 0, z)
+    if v.Magnitude > 1 then v = v.Unit end
+    return v
+end
+
+local renderConn, savedCamData, camPos
+
+local function startFreecam()
+    savedCamData = saveCamera()
+    freezeHumanoid()
+    cam.CameraType = Enum.CameraType.Scriptable
+    camPos = seedOrientation(cam.CFrame)
+    if UserInputService.TouchEnabled then
+        moveArrows.Visible = true
+    end
+    freecamEnabled = true
+    setToggleVisual(true)
+    renderConn = RunService.RenderStepped:Connect(function(dt)
+        local rot = CFrame.Angles(0, yaw, 0) * CFrame.Angles(pitch, 0, 0)
+        local mv = keyboardMoveVector()
+        local delta = (rot.RightVector * mv.X + rot.LookVector * -mv.Z) * moveSpeed * dt
+        camPos += delta
+        cam.CFrame = CFrame.new(camPos) * rot
+    end)
+end
+
+local function stopFreecam()
+    freecamEnabled = false
+    setToggleVisual(false)
+    if renderConn then
+        renderConn:Disconnect()
+        renderConn = nil
+    end
+    moveArrows.Visible = false
+    restoreCamera(savedCamData)
+    unfreezeHumanoid()
+    keysDown = {W=false, A=false, S=false, D=false}
+end
+
+local function hold(btn, setter)
+    btn.MouseButton1Down:Connect(function() if freecamEnabled then setter(true) end end)
+    btn.MouseButton1Up:Connect(function() setter(false) end)
+    btn.TouchLongPress:Connect(function(_, s) if s == Enum.LongPressState.End then setter(false) end end)
+    btn.TouchTap:Connect(function() end)
+end
+
+hold(btnW, function(v) keysDown.W = v end)
+hold(btnA, function(v) keysDown.A = v end)
+hold(btnS, function(v) keysDown.S = v end)
+hold(btnD, function(v) keysDown.D = v end)
+
+UserInputService.InputChanged:Connect(function(input, gp)
+    if gp or not freecamEnabled then return end
+    if UserInputService.TouchEnabled and input.UserInputType == Enum.UserInputType.Touch then
+        local vp = cam.ViewportSize
+        if input.Position.X >= vp.X * 0.66 then
+            yaw -= input.Delta.X * mouseSensitivity
+            pitch -= input.Delta.Y * mouseSensitivity
+            pitch = math.clamp(pitch, math.rad(-85), math.rad(85))
+        end
+    end
+end)
+
+toggle.MouseButton1Click:Connect(function()
+    if freecamEnabled then
+        stopFreecam()
+    else
+        startFreecam()
+    end
+end)
