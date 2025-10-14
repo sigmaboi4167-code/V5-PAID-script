@@ -1,0 +1,105 @@
+local HUE_INCREMENT = 0.005    -- Controls the speed of the color cycle (smaller is slower)
+local UPDATE_FREQUENCY = 0.01  -- Update delay in seconds (lower is smoother)
+
+-- Base directory for finding the weapon models and hammers
+local searchRoot = workspace.Const.Ignore
+
+-- 1. Define the specific arms parts (from the original request)
+local specificArms = {
+    workspace.Const.Ignore.FPSArms:WaitForChild("LeftHand"),
+    workspace.Const.Ignore.FPSArms:WaitForChild("LeftLowerArm"),
+    workspace.Const.Ignore.FPSArms:WaitForChild("LeftUpperArm"),
+    workspace.Const.Ignore.FPSArms:WaitForChild("RightHand"),
+    workspace.Const.Ignore.FPSArms:WaitForChild("RightLowerArm"),
+    workspace.Const.Ignore.FPSArms:WaitForChild("RightUpperArm"),
+    workspace.Const.Ignore.FPSArms.Fake:WaitForChild("c_LeftLowerArm"),
+    workspace.Const.Ignore.FPSArms.Fake:WaitForChild("c_RightLowerArm")
+}
+
+-- 2. Define the weapon names to search for
+local weaponNames = {
+    "AR15", "C9", "Crossbow", "Bow", "EnergyRifle", "GaussRifle",
+    "HMAR", "KABAR", "LeverActionRifle", "M4A1", "PipePistol",
+    "PipeSMG", "PumpShotgun", "SCAR", "SVD", "USP9", "UZI", "Blunderbuss"
+}
+
+-- 3. Function to recursively find all BaseParts in a container
+local function findAllBaseParts(container, partsList)
+    for _, child in ipairs(container:GetChildren()) do
+        if child:IsA("BasePart") and not child.Name:match("Handle") then
+            -- Exclude common handles, as these are sometimes the parent of the whole weapon model
+            table.insert(partsList, child)
+        elseif child:IsA("Model") or child:IsA("Folder") or child:IsA("BasePart") then
+            -- Recurse into models, folders, and parts (in case of assemblies)
+            findAllBaseParts(child, partsList)
+        end
+    end
+end
+
+-- 4. Gather all parts into a single list
+local allParts = {}
+
+-- Add specific arm parts
+for _, part in ipairs(specificArms) do
+    if part and part:IsA("BasePart") then
+        table.insert(allParts, part)
+    end
+end
+
+-- Add all parts from the listed weapons
+for _, name in ipairs(weaponNames) do
+    local weaponModel = searchRoot:FindFirstChild(name)
+    if weaponModel then
+        findAllBaseParts(weaponModel, allParts)
+    end
+end
+
+-- Add all parts from the "Trident Survival" hammers
+-- This assumes a folder or model named "TridentHammers" exists in the searchRoot
+local hammersModel = searchRoot:FindFirstChild("TridentHammers")
+if not hammersModel then
+    -- Fallback: Check if the FPSArms also contains a dedicated hammer model/folder
+    hammersModel = workspace.Const.Ignore.FPSArms:FindFirstChild("TridentHammers")
+end
+
+if hammersModel then
+    print("Found TridentHammers model. Including its parts.")
+    findAllBaseParts(hammersModel, allParts)
+else
+    print("WARNING: Could not find 'TridentHammers' in the expected location.")
+end
+
+
+-- 5. Initial Setup: Set all collected parts to ForceField material
+local partsCount = #allParts
+print(string.format("Applying ForceField material to %d total parts...", partsCount))
+
+for _, part in ipairs(allParts) do
+    part.Material = Enum.Material.ForceField
+end
+
+print("ForceField material applied. Starting smooth rainbow cycle...")
+
+-- 6. Continuous Loop: Cycle the color
+local currentHue = 0
+
+while true do
+    task.wait(UPDATE_FREQUENCY)
+
+    -- Increment the hue and wrap it around
+    currentHue = currentHue + HUE_INCREMENT
+    if currentHue > 1.0 then
+        currentHue = 0
+    end
+
+    -- Create the new color (full saturation and value for bright rainbow)
+    local rainbowColor = Color3.fromHSV(currentHue, 1, 1)
+
+    -- Apply the new color to all collected parts
+    for _, part in ipairs(allParts) do
+        -- Check if the part still exists before trying to modify it
+        if part.Parent ~= nil then
+            part.Color = rainbowColor
+        end
+    end
+end
