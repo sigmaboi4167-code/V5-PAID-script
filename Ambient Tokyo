@@ -1,0 +1,48 @@
+local Lighting = game:GetService("Lighting")
+local FullBright = true 
+
+-- Ensure lighting effects exist
+local function ensureEffects()
+    local stimEffect = Lighting:FindFirstChild("StimEffect")
+    if not stimEffect then
+        stimEffect = Instance.new("ColorCorrectionEffect")
+        stimEffect.Name = "StimEffect"
+        stimEffect.Parent = Lighting
+    end
+    local bloomEffect = Lighting:FindFirstChild("TokyoBloom")
+    if not bloomEffect then
+        bloomEffect = Instance.new("BloomEffect")
+        bloomEffect.Name = "TokyoBloom"
+        bloomEffect.Intensity = 0.3
+        bloomEffect.Size = 24
+        bloomEffect.Threshold = 0.8
+        bloomEffect.Parent = Lighting
+    end
+    return stimEffect, bloomEffect
+end
+
+game:GetService("RunService").Heartbeat:Connect(function()
+    local success, err = pcall(function()
+        local stimEffect, bloomEffect = ensureEffects()
+        if FullBright then
+            -- Tokyo neon aesthetic: vibrant pink/purple/blue tones
+            sethiddenproperty(stimEffect, "Brightness", 0.20) -- Slightly brighter for urban glow
+            sethiddenproperty(stimEffect, "Contrast", 0.2) -- Subtle contrast for crispness
+            sethiddenproperty(stimEffect, "Saturation", 0.5) -- Reduced to avoid green tint
+            sethiddenproperty(stimEffect, "TintColor", Color3.fromRGB(200, 150, 255)) -- Purple-blue neon tint
+            sethiddenproperty(stimEffect, "Enabled", true)
+            sethiddenproperty(bloomEffect, "Enabled", true)
+        else
+            -- Default Roblox lighting
+            sethiddenproperty(stimEffect, "Brightness", 0)
+            sethiddenproperty(stimEffect, "Contrast", 0)
+            sethiddenproperty(stimEffect, "Saturation", 0)
+            sethiddenproperty(stimEffect, "TintColor", Color3.fromRGB(255, 255, 255))
+            sethiddenproperty(stimEffect, "Enabled", false)
+            sethiddenproperty(bloomEffect, "Enabled", false)
+        end
+    end)
+    if not success then
+        warn("Tokyo Ambient Error: " .. tostring(err))
+    end
+end)
