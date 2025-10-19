@@ -30,7 +30,7 @@ local function createTextESP(part)
             local pos, onScreen = Camera:WorldToViewportPoint(part.Position)
             if onScreen then
                 label.Position = Vector2.new(pos.X, pos.Y)
-                label.Text = string.format("State [%.0f]", distance)
+                label.Text = string.format("ClaimTotem [%.0f]", distance)
                 label.Visible = true
             else
                 label.Visible = false
