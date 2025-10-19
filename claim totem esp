@@ -1,0 +1,56 @@
+local RunService = game:GetService("RunService")
+local Camera = workspace.CurrentCamera
+local CoreGui = game:GetService("CoreGui")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+-- ESP container
+local container = Instance.new("Folder", CoreGui:FindFirstChild("RobloxGui") or CoreGui)
+container.Name = "ClaimTotemESP"
+
+
+local function createTextESP(part)
+    if not part:IsDescendantOf(workspace) then return end
+
+    local label = Drawing.new("Text")
+    label.Size = 14
+    label.Font = 2
+    label.Center = true
+    label.Outline = true
+    label.Color = Color3.fromRGB(0, 170, 255) -- Blue
+    label.Visible = false
+
+    RunService.Heartbeat:Connect(function()
+        if not part:IsDescendantOf(workspace) then
+            label.Visible = false
+            return
+        end
+
+        local distance = (Camera.CFrame.Position - part.Position).Magnitude
+        if distance <= 1000 then
+            local pos, onScreen = Camera:WorldToViewportPoint(part.Position)
+            if onScreen then
+                label.Position = Vector2.new(pos.X, pos.Y)
+                label.Text = string.format("State [%.0f]", distance)
+                label.Visible = true
+            else
+                label.Visible = false
+            end
+        else
+            label.Visible = false
+        end
+    end)
+end
+
+
+local prefabState = ReplicatedStorage.Shared.items["place downs"].ClaimTotemItem.Image.ClaimTotem:FindFirstChild("State")
+if not prefabState or not prefabState:IsA("BasePart") then
+    warn("Reference State part not found in prefab")
+    return
+end
+
+
+for _, obj in ipairs(workspace:GetDescendants()) do
+    if obj:IsA("BasePart") and obj.Name == prefabState.Name then
+        createTextESP(obj)
+    end
+end
