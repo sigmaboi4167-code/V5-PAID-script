@@ -1,131 +1,134 @@
-local UserInputService = game:GetService("UserInputService")
-local Camera = workspace.CurrentCamera
-local Mouse = game:GetService("Players").LocalPlayer:GetMouse()
 local RunService = game:GetService("RunService")
-local GuiService = game:GetService("GuiService")
-local GuiInset = GuiService:GetGuiInset()
+local Camera = workspace.CurrentCamera
 
-local isMobile = UserInputService.TouchEnabled and not UserInputService.MouseEnabled
-
-local fov_settings = {
-    enabled = true,
-    size = 200,
-    color = Color3.new(1, 1, 1), -- White
-    outline = true,
-    outline_color = Color3.new(0, 0, 0), -- Black
-    filled = false
-}
-
-local validcharacters = {}
-do
-    local function addtovc(obj)
-        if not obj or not obj:FindFirstChild("Head") or not obj:FindFirstChild("Torso") then return end
-        validcharacters[obj] = obj
-    end
-    local function removefromvc(obj)
-        validcharacters[obj] = nil
-    end
-    for _, v in next, workspace:GetChildren() do addtovc(v) end
-    workspace.ChildAdded:Connect(addtovc)
-    workspace.ChildRemoved:Connect(removefromvc)
-end
-
-local function get_closest_target()
-    local part, spos = nil, nil
-    local maximum_distance = fov_settings.size -- Restrict to FOV radius
-    local target_pos
-    if isMobile then
-        local viewportSize = Camera.ViewportSize
-        target_pos = Vector2.new(viewportSize.X / 2, viewportSize.Y / 2)
-    else
-        target_pos = Vector2.new(Mouse.X, Mouse.Y)
-    end
-    for _, character in validcharacters do
-        local hitpart = character:FindFirstChild("Head")
-        if hitpart then
-            local position, onscreen = Camera:WorldToViewportPoint(hitpart.Position)
-            local distance = (Vector2.new(position.X, position.Y) - target_pos).Magnitude
-            if onscreen and distance < maximum_distance then
-                part = hitpart
-                maximum_distance = distance
-                spos = Vector2.new(position.X, position.Y)
+local GetFunction = function(Script, Line)
+    for _, v in pairs(getgc()) do
+        if typeof(v) == "function" and debug.info(v, "sl") then
+            local src, lineNum = debug.info(v, "s"), debug.info(v, "l")
+            if src:find(Script) and lineNum == Line then
+                return v
             end
         end
     end
-    return part, spos
 end
 
-local snaplinedrawing = Drawing.new("Line")
-snaplinedrawing.Transparency = 1
-snaplinedrawing.Thickness = 1
-snaplinedrawing.ZIndex = 1
-snaplinedrawing.Color = Color3.new(1, 0, 0) 
-snaplinedrawing.Visible = true
+local SetInfraredEnabled = GetFunction("PlayerClient", 588)
+local PlayerReg = debug.getupvalue(SetInfraredEnabled, 2)
 
-local fov_circle = Drawing.new("Circle")
-fov_circle.Transparency = 1
-fov_circle.Thickness = 1
-fov_circle.ZIndex = 2
-fov_circle.Color = fov_settings.color
-fov_circle.Radius = fov_settings.size
-fov_circle.Filled = fov_settings.filled
-fov_circle.Visible = fov_settings.enabled
-
-local fov_outline = Drawing.new("Circle")
-fov_outline.Transparency = 1
-fov_outline.Thickness = 3
-fov_outline.ZIndex = 1
-fov_outline.Color = fov_settings.outline_color
-fov_outline.Radius = fov_settings.size
-fov_outline.Filled = fov_settings.filled
-fov_outline.Visible = fov_settings.enabled and fov_settings.outline
+local domagic = true
+local fov = true
+local fov_show = true
+local fov_size = 150
+local snapline = true
+local sleep_check = true
 
 local target, spos, cachedtarget
-RunService.RenderStepped:Connect(function()
-    if not cachedtarget then
-        target, spos = get_closest_target()
-    end
-    if target and spos then
-        snaplinedrawing.Visible = true
-        if isMobile then
-            local viewportSize = Camera.ViewportSize
-            snaplinedrawing.From = Vector2.new(viewportSize.X / 2, viewportSize.Y / 2)
-        else
-            snaplinedrawing.From = Vector2.new(Mouse.X, Mouse.Y + GuiInset.Y)
+
+local CircleOutline = Drawing.new("Circle")
+CircleOutline.Thickness = 2
+CircleOutline.Color = Color3.new(0,0,0)
+CircleOutline.Filled = false
+CircleOutline.NumSides = 64
+CircleOutline.Visible = true
+
+local CircleInline = Drawing.new("Circle")
+CircleInline.Thickness = 1
+CircleInline.Color = Color3.new(1,1,1)
+CircleInline.Filled = false
+CircleInline.NumSides = 64
+CircleInline.Visible = true
+
+local snaplinedrawing = Drawing.new("Line")
+snaplinedrawing.Thickness = 1
+snaplinedrawing.Color = Color3.new(1,1,1)
+snaplinedrawing.Visible = false
+
+local function update_fov()
+    CircleInline.Radius = fov_size
+    CircleInline.Visible = fov and fov_show
+    CircleOutline.Radius = fov_size
+    CircleOutline.Visible = fov and fov_show
+end
+update_fov()
+
+local function IsSleeping(model)
+    if model and model:FindFirstChild("AnimationController") and model.AnimationController:FindFirstChild("Animator") then
+        for _, v in pairs(model.AnimationController.Animator:GetPlayingAnimationTracks()) do
+            if v.Animation and v.Animation.AnimationId == "rbxassetid://13280887764" then
+                return true
+            end
         end
+    end
+    return false
+end
+
+local function get_closest_target()
+    local closest, spos
+    local max_dist = fov_size
+    local center = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+
+    for _, player in pairs(PlayerReg) do
+        if player and player.model then
+            local head = player.model:FindFirstChild("Head")
+            if head and (not sleep_check or not IsSleeping(player.model)) then
+                local pos, onscreen = Camera:WorldToViewportPoint(head.Position)
+                if onscreen then
+                    local dist = (Vector2.new(pos.X,pos.Y) - center).Magnitude
+                    if dist < max_dist then
+                        closest = head
+                        spos = Vector2.new(pos.X,pos.Y)
+                        max_dist = dist
+                    end
+                end
+            end
+        end
+    end
+    return closest, spos
+end
+
+RunService.RenderStepped:Connect(function()
+    target, spos = get_closest_target()
+    local center = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+
+    if target and spos then
+        snaplinedrawing.Visible = snapline
+        snaplinedrawing.From = center
         snaplinedrawing.To = spos
     else
         snaplinedrawing.Visible = false
     end
-    if isMobile then
-        local viewportSize = Camera.ViewportSize
-        fov_circle.Position = Vector2.new(viewportSize.X / 2, viewportSize.Y / 2)
-        fov_outline.Position = Vector2.new(viewportSize.X / 2, viewportSize.Y / 2)
-    else
-        fov_circle.Position = Vector2.new(Mouse.X, Mouse.Y + GuiInset.Y)
-        fov_outline.Position = Vector2.new(Mouse.X, Mouse.Y + GuiInset.Y)
-    end
+
+    CircleOutline.Position = center
+    CircleInline.Position = center
 end)
 
-do
-    local function addtovc(obj)
-        if not obj or not obj:FindFirstChild("whiz") then return end
-        local confirmed = false
-        obj:GetPropertyChangedSignal("CFrame"):Connect(function()
-            if not confirmed and (Camera.CFrame.Position - obj.CFrame.Position).Magnitude < 1 then
-                confirmed = true
+local function add_magic(obj)
+    if not obj then return end
+    if not obj:FindFirstChild("whiz") then return end
+    if not domagic then return end
+
+    local confirmed = false
+    obj:GetPropertyChangedSignal("CFrame"):Connect(function()
+        if not confirmed and (Camera.CFrame.Position - obj.CFrame.Position).Magnitude < 1 then
+            confirmed = true
+        end
+        if confirmed and (cachedtarget or target) then
+            if not cachedtarget then cachedtarget = target end
+            local bulletpos = obj.CFrame.Position
+            local primary = cachedtarget.Parent and cachedtarget.Parent.PrimaryPart
+            if primary and primary:IsA("BasePart") then
+                primary.CFrame = CFrame.new(Vector3.new(bulletpos.X, primary.Position.Y, bulletpos.Z))
             end
-            if confirmed and (cachedtarget or target) then
-                if not cachedtarget then cachedtarget = target end
-                local bulletpos = obj.CFrame.Position
-                cachedtarget.Parent.PrimaryPart.CFrame = CFrame.new(Vector3.new(bulletpos.X, cachedtarget.Position.Y, bulletpos.Z))
-            end
-        end)
-        RunService.Heartbeat:Connect(function()
-            if not obj or not obj.Parent then
-                cachedtarget = false
-            end
-        end)
-    end
-    workspace.Const.Ignore.ChildAdded:Connect(addtovc)
+        end
+    end)
+
+    RunService.Heartbeat:Connect(function()
+        if not obj or not obj.Parent then
+            cachedtarget = false
+        end
+    end)
+end
+
+if workspace:FindFirstChild("Const") and workspace.Const:FindFirstChild("Ignore") then
+    workspace.Const.Ignore.ChildAdded:Connect(add_magic)
 end
