@@ -1,0 +1,32 @@
+local replicatedStorage = game:GetService("ReplicatedStorage")
+local arrow = replicatedStorage:WaitForChild("Arrow")
+local trail = arrow:WaitForChild("Trail")
+
+
+trail.Lifetime = 20
+
+
+trail.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)), -- Bright red
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(200, 0, 0)), -- Darker red
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 0)) -- Back to bright red
+})
+
+-- Optional: Animate transparency for pulsating effect
+trail.Transparency = NumberSequence.new({
+    NumberSequenceKeypoint.new(0, 0), -- Fully opaque
+    NumberSequenceKeypoint.new(0.5, 0.3), -- Slightly transparent
+    NumberSequenceKeypoint.new(1, 0) -- Fully opaque
+})
+
+
+local function pulseWidth()
+    while true do
+        trail.WidthScale = 1
+        wait(0.5)
+        trail.WidthScale = 1.5
+        wait(0.5)
+    end
+end
+
+spawn(pulseWidth) 
