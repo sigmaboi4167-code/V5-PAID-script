@@ -1,0 +1,51 @@
+local RunService = game:GetService("RunService")
+local Camera = workspace.CurrentCamera
+local CoreGui = game:GetService("CoreGui")
+
+local container = Instance.new("Folder", CoreGui:FindFirstChild("RobloxGui") or CoreGui)
+container.Name = "BoatESP"
+
+local function createTextESP(part)
+    if not part:IsDescendantOf(workspace) then return end
+
+    local label = Drawing.new("Text")
+    label.Size = 14
+    label.Font = 2
+    label.Center = true
+    label.Outline = true
+    label.Color = Color3.fromRGB(0, 170, 255)
+    label.Visible = false
+
+    RunService.Heartbeat:Connect(function()
+        if not part or not part:IsDescendantOf(workspace) or not part.Position or not Camera or not Camera.ViewportSize then
+            label.Visible = false
+            return
+        end
+
+        local distance = (Camera.CFrame.Position - part.Position).Magnitude
+        if distance <= 20000 then
+            local pos, onScreen = Camera:WorldToViewportPoint(part.Position + Vector3.new(0, 3, 0))
+            if onScreen and pos.Z > 0 and type(pos.X) == "number" and type(pos.Y) == "number" then
+                label.Position = Vector2.new(pos.X, pos.Y)
+                label.Text = string.format("Boat [%.0f]", distance)
+                label.Visible = true
+            else
+                label.Visible = false
+            end
+        else
+            label.Visible = false
+        end
+    end)
+end
+
+for _, obj in ipairs(workspace:GetDescendants()) do
+    if obj:IsA("BasePart") and obj.Name == "WindBlock" then
+        createTextESP(obj)
+    end
+end
+
+workspace.DescendantAdded:Connect(function(obj)
+    if obj:IsA("BasePart") and obj.Name == "WindBlock" then
+        createTextESP(obj)
+    end
+end)
