@@ -1,0 +1,72 @@
+local RunService = game:GetService("RunService")
+local Camera = workspace.CurrentCamera
+local CoreGui = game:GetService("CoreGui")
+
+local container = Instance.new("Folder", CoreGui:FindFirstChild("RobloxGui") or CoreGui)
+container.Name = "HelicopterESP"
+
+local espLabels = {}
+
+local function createTextESP(model)
+    local primaryPart = model.PrimaryPart or model:FindFirstChild("HeadLockPart")
+    if not primaryPart or not primaryPart:IsDescendantOf(workspace) or not primaryPart:IsA("BasePart") then return end
+
+    local label = Drawing.new("Text")
+    label.Size = 14
+    label.Font = 2
+    label.Center = true
+    label.Outline = true
+    label.Color = Color3.fromRGB(0, 170, 255)
+    label.Visible = false
+
+    espLabels[model] = label
+
+    model.AncestryChanged:Connect(function()
+        if not model:IsDescendantOf(workspace) then
+            label:Remove()
+            espLabels[model] = nil
+        end
+    end)
+
+    return label
+end
+
+local function updateESP()
+    for model, label in pairs(espLabels) do
+        local primaryPart = model.PrimaryPart or model:FindFirstChild("HeadLockPart")
+        if not primaryPart or not primaryPart:IsDescendantOf(workspace) or not primaryPart.Position or not Camera or not Camera.ViewportSize then
+            label.Visible = false
+        else
+            local distance = (Camera.CFrame.Position - primaryPart.Position).Magnitude
+            if distance <= 20000 then
+                local pos, onScreen = Camera:WorldToViewportPoint(primaryPart.Position + Vector3.new(0, 3, 0))
+                if onScreen and pos.Z > 0 and type(pos.X) == "number" and type(pos.Y) == "number" then
+                    label.Position = Vector2.new(pos.X, pos.Y)
+                    label.Text = string.format("Helicopter [%.0f]", distance)
+                    label.Visible = true
+                else
+                    label.Visible = false
+                end
+            else
+                label.Visible = false
+            end
+        end
+    end
+end
+
+for _, model in ipairs(workspace:GetChildren()) do
+    if model:IsA("Model") and model:FindFirstChild("HeadLockPart") and model:FindFirstChild("HeadLockPart"):IsA("BasePart") then
+        createTextESP(model)
+    end
+end
+
+workspace.ChildAdded:Connect(function(model)
+    if model:IsA("Model") and model:WaitForChild("HeadLockPart", 1) and model:FindFirstChild("HeadLockPart"):IsA("BasePart") then
+        local label = createTextESP(model)
+        if label then
+            updateESP() -- Immediately update ESP for new spawn
+        end
+    end
+end)
+
+RunService.Heartbeat:Connect(updateESP)
