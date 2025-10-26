@@ -1,0 +1,227 @@
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local NEXT = _G.NEXT
+local CUSTOM_SPEED = 250
+local UPSPEED = 30
+local ACCEL = 200
+local YAW_RATE = 0.5
+local MAX_FORCE = 20000
+local oldNewIndex
+local mt = getrawmetatable(game)
+local newIndex = mt.__newindex
+if hookmetamethod then
+    oldNewIndex = hookmetamethod(game, "__newindex", function(t, k, v)
+        if (k == "CFrame" or k == "AssemblyLinearVelocity") and checkcaller() then
+            return
+        end
+        return oldNewIndex(t, k, v)
+    end)
+end
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "BoatBoostUI"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = game:GetService("CoreGui")
+local Frame = Instance.new("Frame")
+Frame.Size = UDim2.new(0, 200, 0, 100)
+Frame.Position = UDim2.new(0.5, -100, 0.5, -50)
+Frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+Frame.BorderSizePixel = 0
+Frame.Active = true
+Frame.Draggable = true
+Frame.Parent = ScreenGui
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 10)
+UICorner.Parent = Frame
+local Button = Instance.new("TextButton")
+Button.Size = UDim2.new(1, -20, 0, 50)
+Button.Position = UDim2.new(0, 10, 0.5, -25)
+Button.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+Button.Text = "🚤 Boat Boost"
+Button.TextColor3 = Color3.fromRGB(255, 255, 255)
+Button.Font = Enum.Font.GothamBold
+Button.TextSize = 18
+Button.Parent = Frame
+local ButtonCorner = Instance.new("UICorner")
+ButtonCorner.CornerRadius = UDim.new(0, 8)
+ButtonCorner.Parent = Button
+local boat = nil
+local buildup = 0
+local lastdir = Vector3.new(0, 0, 1)
+local yaw = 0
+local function findBoat()
+    boat = nil
+    local workspaceChildren = workspace:GetChildren()
+    if workspaceChildren[381] and workspaceChildren[381]:FindFirstChild("Hull") then
+        boat = workspaceChildren[381]
+        boat.PrimaryPart = boat.Hull
+    elseif NEXT and NEXT.model and NEXT.model:FindFirstChild("Hull") then
+        boat = NEXT.model
+        boat.PrimaryPart = boat.Hull
+    else
+        for _, v in pairs(workspace:GetChildren()) do
+            if v:IsA("Model") and v:FindFirstChild("Hull") then
+                boat = v
+                boat.PrimaryPart = v.Hull
+                break
+            end
+        end
+    end
+end
+findBoat()
+local isBoostOn = false
+local connection = nil
+local function applyBoost()
+    if not boat or not boat:FindFirstChild("Hull") then return end
+    local hull = boat.Hull
+    if connection then connection:Disconnect() end
+    if isBoostOn then
+        Button.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
+        Button.Text = "✅ Boat Boost ON"
+        connection = RunService.Heartbeat:Connect(function(delta)
+            if not boat or not boat.Parent or not boat:FindFirstChild("Hull") then
+                connection:Disconnect()
+                boat = nil
+                findBoat()
+                return
+            end
+            local cameralook = game.Workspace.CurrentCamera.CFrame.LookVector
+            cameralook = Vector3.new(cameralook.X, 0, cameralook.Z).Unit
+            local direction = Vector3.zero
+            local isMoving = false
+            if UserInputService:IsKeyDown(Enum.KeyCode.W) then
+                direction = direction + cameralook
+                isMoving = true
+            end
+            if UserInputService:IsKeyDown(Enum.KeyCode.S) then
+                direction = direction - cameralook
+                isMoving = true
+            end
+            if UserInputService:IsKeyDown(Enum.KeyCode.D) then
+                direction = direction + Vector3.new(-cameralook.Z, 0, cameralook.X)
+                isMoving = true
+            end
+            if UserInputService:IsKeyDown(Enum.KeyCode.A) then
+                direction = direction + Vector3.new(cameralook.Z, 0, -cameralook.X)
+                isMoving = true
+            end
+            if UserInputService:IsKeyDown(Enum.KeyCode.V) then
+                direction = direction + Vector3.yAxis
+                isMoving = true
+            end
+            if UserInputService:IsKeyDown(Enum.KeyCode.B) then
+                direction = direction - Vector3.yAxis
+                isMoving = true
+            end
+            if UserInputService:IsKeyDown(Enum.KeyCode.A) then
+                yaw = yaw + YAW_RATE * delta
+            elseif UserInputService:IsKeyDown(Enum.KeyCode.D) then
+                yaw = yaw - YAW_RATE * delta
+            end
+            if isMoving and direction ~= Vector3.zero then
+                direction = direction.Unit
+                if direction ~= Vector3.yAxis and direction ~= -Vector3.yAxis then
+                    buildup = math.clamp(buildup + delta * ACCEL, 0, CUSTOM_SPEED)
+                    lastdir = direction
+                end
+            else
+                buildup = 0
+                direction = Vector3.zero
+            end
+            local waterLevel = workspace:GetAttribute("WaterLevel") or 0
+            local newPos = hull.CFrame.Position + direction * buildup * delta
+            newPos = Vector3.new(newPos.X, math.max(newPos.Y, waterLevel + 2), newPos.Z)
+            local newCFrame = CFrame.new(newPos) * CFrame.Angles(0, yaw, 0)
+            boat:PivotTo(newCFrame)
+            for _, v in pairs(boat:GetChildren()) do
+                if v:IsA("BasePart") then
+                    v.AssemblyLinearVelocity = Vector3.new(direction.X * buildup, direction.Y * UPSPEED, direction.Z * buildup)
+                end
+            end
+            if hull:FindFirstChild("LinearVelocity") then
+                hull.LinearVelocity.Enabled = true
+                hull.LinearVelocity.MaxForce = MAX_FORCE
+                hull.LinearVelocity.VectorVelocity = Vector3.new(direction.X * buildup, direction.Y * UPSPEED, direction.Z * buildup)
+            end
+            if NEXT and NEXT.Move then
+                local targetPos = hull.Position + direction * buildup * 0.15
+                local currentRot = Vector3.new(0, yaw, 0)
+                NEXT:Move(targetPos, currentRot, 0, 1)
+            end
+            if NEXT and NEXT.ApplyVelocity then
+                NEXT:ApplyVelocity(Vector3.new(direction.X * buildup, direction.Y * UPSPEED, direction.Z * buildup), nil)
+            end
+            if hull:FindFirstChild("MotorSound") then
+                hull.MotorSound:Stop()
+                hull.MotorSound.PlaybackSpeed = 0
+                hull.MotorSound.Volume = 0
+            end
+            if hull:FindFirstChild("Steer") and hull.Steer:FindFirstChild("AngularVelocity") then
+                hull.Steer.AngularVelocity.AngularVelocity = Vector3.new(0, 0, 0)
+                hull.Steer.AngularVelocity.MaxTorque = Vector3.new(0, 0, 0)
+            end
+            if hull:FindFirstChild("AlignPosition") then
+                hull.AlignPosition.Enabled = false
+                hull.AlignPosition.MaxForce = 0
+            end
+        end)
+    else
+        Button.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+        Button.Text = "🚤 Boat Boost"
+        for _, v in pairs(boat:GetChildren()) do
+            if v:IsA("BasePart") then
+                v.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+            end
+        end
+        if hull:FindFirstChild("LinearVelocity") then
+            hull.LinearVelocity.Enabled = false
+            hull.LinearVelocity.MaxForce = 0
+            hull.LinearVelocity.VectorVelocity = Vector3.new(0, 0, 0)
+        end
+        if NEXT and NEXT.ApplyVelocity then
+            NEXT:ApplyVelocity(Vector3.new(0, 0, 0), nil)
+        end
+        if hull:FindFirstChild("MotorSound") then
+            hull.MotorSound:Stop()
+            hull.MotorSound.PlaybackSpeed = 0
+            hull.MotorSound.Volume = 0
+        end
+        if hull:FindFirstChild("Steer") and hull.Steer:FindFirstChild("AngularVelocity") then
+            hull.Steer.AngularVelocity.AngularVelocity = Vector3.new(0, 0, 0)
+            hull.Steer.AngularVelocity.MaxTorque = Vector3.new(0, 0, 0)
+        end
+        if hull:FindFirstChild("AlignPosition") then
+            hull.AlignPosition.Enabled = true
+            hull.AlignPosition.MaxForce = math.huge
+        end
+        yaw = 0
+    end
+end
+Button.MouseButton1Click:Connect(function()
+    isBoostOn = not isBoostOn
+    local boatsFound = 0
+    for _, model in ipairs(workspace:GetChildren()) do
+        if model:IsA("Model") and model:FindFirstChild("Hull") then
+            boatsFound += 1
+        end
+    end
+    if isBoostOn and boatsFound > 0 then
+        Button.Text = "✅ Boosted " .. boatsFound .. " Boat(s)!"
+        task.wait(2)
+        Button.Text = "✅ Boat Boost ON"
+    end
+    findBoat()
+    applyBoost()
+end)
+RunService.Heartbeat:Connect(function()
+    if boat and boat.Parent and boat:FindFirstChild("Hull") then return end
+    findBoat()
+    if boat then
+        applyBoost()
+    end
+end)
+game:BindToClose(function()
+    if hookmetamethod and oldNewIndex then
+        hookmetamethod(game, "__newindex", oldNewIndex)
+    end
+end)
