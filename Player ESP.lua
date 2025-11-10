@@ -126,11 +126,9 @@ end
 
 local function create_player_esp(model)
     if not (model and model:FindFirstChild("Head") and model:FindFirstChild("LowerTorso")) then
-        print("Invalid model for ESP: " .. tostring(model))
         return
     end
     local player = Players:GetPlayerFromCharacter(model)
-    print("Detected player model: " .. tostring(model) .. " | Player: " .. (player and player.Name or "Unknown"))
     local settings = esp_table.settings.enemy
     local playerId, isSleeping = getPlayerIdFromModel(model)
     local playerName = player and player.Name or "Player"
